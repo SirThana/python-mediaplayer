@@ -247,7 +247,7 @@ class MenuPage():
         return self.previous_page
 
     def render(self):
-        #set_trace()
+        set_trace()
         lines = []
         total_size = self.total_size()
         for i in range(self.page_start, self.page_start + MENU_PAGE_SIZE):
