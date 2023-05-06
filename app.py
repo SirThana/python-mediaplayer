@@ -247,7 +247,6 @@ class MenuPage():
         return self.previous_page
 
     def render(self):
-        set_trace()
         lines = []
         total_size = self.total_size()
         for i in range(self.page_start, self.page_start + MENU_PAGE_SIZE):
@@ -275,7 +274,7 @@ class MenuRendering(Rendering):
 
 class RootPage(MenuPage):
     def __init__(self, previous_page):
-        super().__init__("Ari's ipod", previous_page, has_sub_page=True)
+        super().__init__("Ari's ipod", previous_page, has_sub_page=True, is_title=True)
         self.pages = [
          "Playlists",
          "Now playing"
@@ -292,8 +291,7 @@ class RootPage(MenuPage):
     def page_at(self, index):
         return self.get_pages()[index]
 
-page = RootPage(None)
-app = tkinterApp() 
+
 
 def flattenAlpha(img):
     global SCALE
@@ -386,6 +384,7 @@ def onDownPressed():
     render(app, page.render())
 
 def render_menu(app, menu_render):
+    set_trace()
     app.show_frame(StartPage)
     page = app.frames[StartPage]
     if(menu_render.total_count > MENU_PAGE_SIZE):
@@ -397,14 +396,17 @@ def render_menu(app, menu_render):
     page.set_header(menu_render.header, menu_render.now_playing, menu_render.has_internet)
 
 def render(app, render):
+    set_trace()
     render_menu(app, render)
-    
+
+page = RootPage(None)
+app = tkinterApp()    
 
 def app_main_loop():
     global app, page, loop_count, last_interaction, screen_on
     try:
         loop_count += 1
-        if (loop_count >= 300):
+        if (loop_count >= 10):
             if (time.time() - last_interaction > SCREEN_TIMEOUT_SECONDS and screen_on):
                 screen_sleep()
             render(app, page.render())

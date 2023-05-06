@@ -4,8 +4,10 @@ from PIL import ImageTk, Image
 import collections
 from pudb import set_trace
 from sys import platform
+from datetime import timedelta
 import time
 import os
+import re as re
 
 MENU_PAGE_SIZE = 2
 
@@ -103,9 +105,8 @@ def render_now_playing(app, now_playing_render):
 
 #? This render method is only called by input from the device?
 def render(app, render):
-    set_trace()
+    print(render.type)
     if (render.type == MENU_RENDER_TYPE):
-        print("rendering menu")
         render_menu(app, render)
     elif (render.type == NOW_PLAYING_RENDER):
         render_now_playing(app, render)
@@ -144,6 +145,7 @@ def onPrevPressed():
     render(app, page.render())
 
 def onUpPressed():
+    #set_trace()
     global page, app
     page.nav_up()
     render(app, page.render())
@@ -236,7 +238,6 @@ def flattenAlpha(img):
     return img
 
 class tkinterApp(tk.Tk): 
-      
     # __init__ function for class tkinterApp  
     def __init__(self, *args, **kwargs):  
         global LARGEFONT, MED_FONT, SCALE
@@ -264,10 +265,14 @@ class tkinterApp(tk.Tk):
         # initializing frames to an empty array 
         self.frames = {}   
 
+        frame = NowPlayingFrame(container, self)
+        self.frames[NowPlayingFrame] = frame
+
         #? initialize startpage frame
         frame = StartPage(container, self)
-        frame.grid(row = 0, column = 0, sticky ="nsew") 
         self.frames[StartPage] = frame #? append it
+
+        frame.grid(row = 0, column = 0, sticky ="nsew") 
 
         # self.show_frame(StartPage) #? now display it!
    
@@ -278,10 +283,353 @@ class tkinterApp(tk.Tk):
         frame = self.frames[cont] 
         frame.tkraise() 
 
+class Rendering():
+    def __init__(self, type):
+        self.type = type
+
+    def unsubscribe(self):
+        pass
+class MenuRendering(Rendering):
+    def __init__(self, header = "", lines = [], page_start = 0, total_count = 0):
+        super().__init__(MENU_RENDER_TYPE)
+        self.lines = lines
+        self.header = header
+        self.page_start = page_start
+        self.total_count = total_count
+        self.now_playing = None
+
+class LineItem():
+    def __init__(self, title = "", line_type = LINE_NORMAL, show_arrow = False):
+        self.title = title
+        self.line_type = line_type
+        self.show_arrow = show_arrow
+
+class MenuPage():
+    def __init__(self, header, previous_page, has_sub_page, is_title = False):
+        self.index = 0
+        self.page_start = 0
+        self.header = header
+        self.has_sub_page = has_sub_page
+        self.previous_page = previous_page
+        self.is_title = is_title
+
+    def total_size(self):
+        return MENU_PAGE_SIZE
+
+    def page_at(self, index):
+        # return self.get_pages()[index]
+        return self.pages[index]
+        # return None
+
+    def nav_prev(self):
+        pass
+
+    def nav_next(self):
+        pass
+
+    def nav_play(self):
+        pass
+    
+    def get_index_jump_up(self):
+        return 1
+
+    def get_index_jump_down(self):
+        return 1
+
+    def nav_up(self):
+        jump = self.get_index_jump_up()
+        if(self.index >= self.total_size() - jump):
+            return
+        if (self.index >= self.page_start + MENU_PAGE_SIZE - jump):
+            self.page_start = self.page_start + jump
+        self.index = self.index + jump
+
+    def nav_down(self):
+        jump = self.get_index_jump_down()
+        if(self.index <= (jump - 1)):
+            return
+        if (self.index <= self.page_start + (jump - 1)):
+            self.page_start = self.page_start - jump
+            if (self.page_start == 1):
+                self.page_start = 0
+        self.index = self.index - jump
+
+    def nav_select(self):
+        return self.page_at(self.index)
+
+    def nav_back(self):
+        return self.previous_page
+
+    def render(self):
+        #set_trace()
+        lines = []
+        total_size = self.total_size()
+        for i in range(self.page_start, self.page_start + MENU_PAGE_SIZE):
+            if (i < total_size):
+                page = self.page_at(i)
+                if (page is None) :
+                    lines.append(LineItem())
+                else:
+                    line_type = LINE_TITLE if page.is_title else \
+                        LINE_HIGHLIGHT if i == self.index else LINE_NORMAL
+                    lines.append(LineItem(page.header, line_type, page.has_sub_page))
+            else:
+                lines.append(LineItem())
+        return MenuRendering(lines=lines, header=self.header, page_start=self.index, total_count=total_size)
+
+
+class RootPage(MenuPage):
+    def __init__(self, previous_page):
+        super().__init__("Ari's ipod", previous_page, has_sub_page=True)
+        self.pages = [
+            # ArtistsPage(self),
+            # AlbumsPage(self),
+            # NewReleasesPage(self),
+            PlaylistsPage(self),
+            # ShowsPage(self),
+            # SearchPage(self),
+            NowPlayingPage(self, "Now Playing", None),
+        ]
+        self.index = 0
+        self.page_start = 0
+
+class NowPlayingPage():
+    def __init__(self, previous_page, header, command):
+        self.has_sub_page = False
+        self.previous_page = previous_page
+        self.command = command
+        self.header = header
+        self.live_render = lambda: True
+        # self.live_render = NowPlayingRendering()
+        self.is_title = False
+
+    def play_previous(self):
+        pass
+        self.live_render.refresh()
+
+    def play_next(self):
+        pass
+        self.live_render.refresh()
+
+    def toggle_play(self):
+        pass
+        self.live_render.refresh()
+
+    def nav_prev(self):
+        pass
+
+    def nav_next(self):
+        pass
+
+    def nav_play(self):
+        pass
+
+    def nav_up(self):
+        pass
+
+class PlaylistsPage(MenuPage):
+    def __init__(self, previous_page):
+        super().__init__(self.get_title(), previous_page, has_sub_page=True)
+        self.playlists = self.get_content()
+        self.num_playlists = len(self.playlists)
+                
+        self.playlists.sort(key=self.get_idx) # sort playlists to keep order as arranged in Spotify library
+
+    def get_title(self):
+        return "Playlists"
+
+    def get_content(self):
+        return ["newplaylist", "another play list"]
+        #return spotify_manager.DATASTORE.getAllSavedPlaylists()
+
+    def get_idx(self, e): # function to get idx from UserPlaylist for sorting
+        return 1
+
+    def total_size(self):
+        return self.num_playlists
+
+    def page_at(self, index):
+        return SinglePlaylistPage(self.playlists[index], self)
+
+class SinglePlaylistPage(MenuPage):
+    def __init__(self, playlist, previous_page):
+        # Credit for code to remove emoticons from string: https://stackoverflow.com/a/49986645
+        regex_pattern = re.compile(pattern = "["
+            u"\U0001F600-\U0001F64F"  # emoticons
+            u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+            u"\U0001F680-\U0001F6FF"  # transport & map symbols
+            u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+                            "]+", flags = re.UNICODE)
+
+        # super().__init__(regex_pattern.sub(r'',playlist.name), previous_page, has_sub_page=True)
+        super().__init__(playlist, previous_page, has_sub_page=True)
+        self.playlist = playlist
+        self.tracks = None
+
+    def get_tracks(self):
+        #set_trace()
+        if self.tracks is None:
+            self.tracks = ["Quin 92 - jealous"]
+            # self.tracks = spotify_manager.DATASTORE.getPlaylistTracks(self.playlist.uri)
+        return self.tracks
+
+    def total_size(self):
+        return 5
+        #return self.playlist.track_count
+
+    def page_at(self, index):
+        track = self.get_tracks()[index]
+        command = None
+        # command = NowPlayingCommand(lambda: spotify_manager.play_from_playlist(self.playlist.uri, track.uri, None))
+        return NowPlayingPage(self, track.title, command) 
+
+class Marquee(tk.Canvas):
+    def __init__(self, parent, text, margin=2, borderwidth=0, relief='flat', fps=24):
+        tk.Canvas.__init__(self, parent, highlightthickness=0, borderwidth=borderwidth, relief=relief, background=SPOT_BLACK)
+        self.fps = fps
+        self.margin = margin
+        self.borderwidth = borderwidth
+        # start by drawing the text off screen, then asking the canvas
+        # how much space we need. Use that to compute the initial size
+        # of the canvas. 
+        self.saved_text = text
+        self.text = self.create_text(0, -1000, text=text, font=LARGEFONT, fill=SPOT_GREEN, anchor="w", tags=("text",))
+        (x0, y0, x1, y1) = self.bbox("text")
+        self.width = (x1 - x0) + (2*margin) + (2*borderwidth)
+        self.height = (y1 - y0) + (2*margin) + (2*borderwidth)
+        self.configure(width=self.width, height=self.height)
+        self.reset = True
+        self.pause_ctr = 100
+        self.after_id = None
+        self.redraw()
+
+    def set_text(self, text):
+        if (self.saved_text == text):
+            return
+        self.saved_text = text
+        self.itemconfig(self.text, text=text)
+        (x0, y0, x1, y1) = self.bbox("text")
+        self.width = (x1 - x0) + (2*self.margin) + (2*self.borderwidth)
+        self.height = (y1 - y0) + (2*self.margin) + (2*self.borderwidth)
+        self.configure(width=self.width, height=self.height)
+        if (self.width > self.winfo_width()):
+            self.coords("text", 100, self.winfo_height()/2)
+        else:
+            self.coords("text", (self.winfo_width() / 2) - (self.width / 2), self.winfo_height()/2)
+        self.pause_ctr = 100
+        self.reset = True
+        self.redraw()
+
+    def redraw(self):
+        if self.after_id:
+            self.after_cancel(self.after_id)
+        (x0, y0, x1, y1) = self.bbox("text")
+        win_width = self.winfo_width()
+        if win_width < 2:
+            pass
+        elif self.width < win_width:
+            self.coords("text", (win_width / 2) - (self.width / 2), self.winfo_height()/2)
+            return 
+        elif x1 < 0 or y0 < 0 or self.reset:
+            self.reset = False
+            self.animating = True
+            x0 = 20
+            y0 = int(self.winfo_height()/2)
+            self.pause_ctr = 100
+            self.coords("text", x0, y0)
+        elif self.pause_ctr > 0:
+            self.pause_ctr = self.pause_ctr - 1
+        else:
+            self.move("text", -2, 0)
+        self.after_id = self.after(int(1000/self.fps), self.redraw) 
+
+class NowPlayingFrame(tk.Frame): 
+    def __init__(self, parent, controller):  
+        tk.Frame.__init__(self, parent) 
+        self.inflated = False
+        self.active = False
+        self.update_time = False
+        self.configure(bg=SPOT_BLACK)
+        self.header_label = tk.Label(self, text ="Now Playing", font = LARGEFONT, background=SPOT_BLACK, foreground=SPOT_GREEN) 
+        self.header_label.grid(sticky='we', padx=(0, 10))
+        self.grid_columnconfigure(0, weight=1)
+        divider = tk.Canvas(self)
+        divider.configure(bg=SPOT_GREEN, height=DIVIDER_HEIGHT, bd=0, highlightthickness=0, relief='ridge')
+        divider.grid(row = 1, column = 0, sticky ="we", pady=10, padx=(10, 30))
+        contentFrame = tk.Canvas(self, bg=SPOT_BLACK, highlightthickness=0, relief='ridge')
+        contentFrame.grid(row = 2, column = 0, sticky ="nswe")
+        contentFrame.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(2, weight=1)
+        self.context_label = tk.Label(contentFrame, text ="", font = MED_FONT, background=SPOT_BLACK, foreground=SPOT_GREEN) 
+        self.context_label.grid(row=0, column=0,sticky ="w", padx=int(50 * SCALE))
+        self.artist_label = tk.Label(contentFrame, text ="", font = LARGEFONT, background=SPOT_BLACK, foreground=SPOT_GREEN) 
+        self.artist_label.grid(row=2, column=0,sticky ="we", padx=(10, 30))
+        self.album_label = tk.Label(contentFrame, text ="", font = LARGEFONT, background=SPOT_BLACK, foreground=SPOT_GREEN) 
+        self.album_label.grid(row=3, column=0,sticky ="we", padx=(10, 30))
+        self.track_label = Marquee(contentFrame, text="")
+        self.track_label.grid(row=1, column=0,sticky ="we", padx=(30, 50))
+        self.progress_frame = tk.Canvas(contentFrame, height=int(72 * SCALE), bg=SPOT_BLACK, highlightthickness=0)
+        self.progress_frame.grid(row=4, column=0,sticky ="we", pady=(int(52 * SCALE), 0), padx=(30, 50))
+        self.frame_img = ImageTk.PhotoImage(flattenAlpha(Image.open('prog_frame.png')))
+        self.time_frame = tk.Canvas(contentFrame, bg=SPOT_BLACK, highlightthickness=0)
+        self.time_frame.grid(row=5, column=0,sticky ="we", padx=0, pady=(10, 0))
+        self.time_frame.grid_columnconfigure(0, weight=1)
+        self.elapsed_time = tk.Label(self.time_frame, text ="00:00", font = LARGEFONT, background=SPOT_BLACK, foreground=SPOT_GREEN)
+        self.elapsed_time.grid(row=0, column=0, sticky ="nw", padx = int(40 * SCALE))
+        self.remaining_time = tk.Label(self.time_frame, text ="-00:00", font = LARGEFONT, background=SPOT_BLACK, foreground=SPOT_GREEN)
+        self.remaining_time.grid(row=0, column=1, sticky ="ne", padx = int(60 * SCALE))
+        self.cached_album = None
+        self.cached_artist = None
+        
+    def update_now_playing(self, now_playing):
+        if not self.inflated:
+            parent_width = self.winfo_width()
+            if parent_width > 2:
+                self.midpoint = (parent_width / 2) - 40
+                self.progress_width = self.frame_img.width()
+                self.progress_start_x = self.midpoint - self.progress_width / 2
+                self.progress = self.progress_frame.create_rectangle(self.progress_start_x, 0, self.midpoint, int(72 * SCALE) , fill=SPOT_GREEN)
+                self.progress_frame.create_image(self.midpoint, (self.frame_img.height() - 1)/2, image=self.frame_img)
+                self.inflated = True
+        if not now_playing:
+            return
+        self.track_label.set_text(now_playing['name'])
+        artist = now_playing['artist']
+        if self.cached_artist != artist:
+            truncd_artist = artist if len(artist) < 20 else artist[0:17] + "..."
+            self.artist_label.configure(text=truncd_artist)
+            self.cached_artist = artist
+        album = now_playing['album']
+        if self.cached_album != album:
+            truncd_album = album if len(album) < 20 else album[0:17] + "..."
+            self.album_label.configure(text=truncd_album)
+            self.cached_album = album
+        context_name = now_playing['context_name']
+        truncd_context = context_name if context_name else "Now Playing"
+        truncd_context = truncd_context if len(truncd_context) < 20 else truncd_context[0:17] + "..."
+        self.header_label.configure(text=truncd_context)
+        update_delta = 0 if not now_playing['is_playing'] else (time.time() - now_playing["timestamp"]) * 1000.0
+        adjusted_progress_ms = now_playing['progress'] + update_delta
+        adjusted_remaining_ms = max(0, now_playing['duration'] - adjusted_progress_ms)
+        if self.update_time:
+            progress_txt = ":".join(str(timedelta(milliseconds=adjusted_progress_ms)).split('.')[0].split(':')[1:3])
+            remaining_txt = "-" + ":".join(str(timedelta(milliseconds=adjusted_remaining_ms)).split('.')[0].split(':')[1:3])
+            self.elapsed_time.configure(text=progress_txt)
+            self.remaining_time.configure(text=remaining_txt)
+        self.update_time = not self.update_time
+        if self.inflated:
+            adjusted_progress_pct = min(1.0, adjusted_progress_ms / now_playing['duration'])
+            self.progress_frame.coords(self.progress, self.progress_start_x, 0, self.progress_width * adjusted_progress_pct + self.progress_start_x, int(72 * SCALE))
+        if(now_playing['track_index'] < 0):
+            self.context_label.configure(text="")
+            return
+        context_str = str(now_playing['track_index']) + " of " + str(now_playing['track_total'])
+        self.context_label.configure(text=context_str)
 
 #? configure the tk Frame layout as a starting page
 class StartPage(tk.Frame): 
     def __init__(self, parent, controller):  
+        global app, page
         tk.Frame.__init__(self, parent) 
         self.green_arrow_image = ImageTk.PhotoImage(flattenAlpha(Image.open('pod_arrow_grn.png')))
         self.black_arrow_image = ImageTk.PhotoImage(flattenAlpha(Image.open('pod_arrow_blk.png')))
@@ -331,7 +679,6 @@ class StartPage(tk.Frame):
             self.listItems.append(item)
             self.arrows.append(imgLabel)
         listFrame.grid_columnconfigure(0, weight=1)
-        # listFrame.grid_columnconfigure(1, weight=1)
     
 
     def show_scroll(self, index, total_count):
@@ -375,11 +722,13 @@ class StartPage(tk.Frame):
 #      'Podcasts', 'Genres', 'Composers', 'Audiobooks']}
 
 
+global app, page
 app = tkinterApp()
+page = RootPage(None)
 
-def render_startpage():
-    global app, page
-    app.show_frame(StartPage)
+# def render_startpage():
+#     global app, page
+#     app.show_frame(StartPage)
 
 # app.after(1, render_startpage)
 app.bind('<KeyPress>', onKeyPress)
